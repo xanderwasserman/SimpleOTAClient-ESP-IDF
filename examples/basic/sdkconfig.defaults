@@ -1,0 +1,19 @@
+# Two OTA app slots (no factory partition; first boot runs from ota_0).
+CONFIG_PARTITION_TABLE_TWO_OTA=y
+# Bootloader-supervised trial boots: a new image gets exactly one attempt
+# until confirmed. Must ship with the FIRST serial flash; the bootloader
+# cannot be updated over OTA.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+# The two-OTA layout needs 4MB flash (2MB default cannot fit two app slots).
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+# Size-optimized builds leave OTA headroom in the 1MB two-OTA app slots.
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# A TLS handshake is a synchronous, CPU-bound operation inside mbedTLS: the
+# OTA task cannot yield while the certificate chain is verified, so the
+# priority-0 IDLE task can be starved for longer than the default 5 s task
+# watchdog window (most visible on the classic ESP32 at 160 MHz, where the
+# first handshake after boot is the slowest). That surfaces as a harmless but
+# alarming "task_wdt: ... IDLE" warning. Widen the window rather than
+# disabling the watchdog, so genuine hangs are still caught.
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=30

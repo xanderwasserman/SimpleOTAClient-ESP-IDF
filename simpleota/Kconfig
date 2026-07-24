@@ -1,0 +1,43 @@
+menu "SimpleOTA"
+
+config SIMPLEOTA_TASK_STACK_SIZE
+    int "OTA task stack size (bytes)"
+    default 12288
+    help
+        The managed task performs TLS handshakes (esp_http_client with the
+        certificate bundle) and cJSON parsing on its own stack. 8192 usually
+        works; the 12288 default leaves headroom on all targets.
+
+config SIMPLEOTA_TASK_PRIORITY
+    int "OTA task priority"
+    range 1 20
+    default 5
+    help
+        Priority of the managed OTA task. Keep it below the Wi-Fi and lwIP
+        tasks (the default 5 is) so networking is never starved.
+
+config SIMPLEOTA_HTTP_TIMEOUT_MS
+    int "HTTP timeout (ms)"
+    default 15000
+    help
+        Socket timeout for the check, status, and download requests. During
+        a download this doubles as the stall detector: a read that makes no
+        progress for this long fails the update with reason
+        "download_stalled".
+
+config SIMPLEOTA_HTTP_TX_BUFFER
+    int "HTTP client TX buffer (bytes)"
+    default 2048
+    help
+        Must fit the entire request line and headers. Pre-signed download
+        URLs are routinely 500-1500+ characters, which overflows the
+        esp_http_client default of 512 bytes.
+
+config SIMPLEOTA_DOWNLOAD_CHUNK
+    int "Download/flash chunk size (bytes)"
+    default 4096
+    help
+        Heap-allocated buffer used to stream the firmware image from the
+        HTTP client into the OTA partition while hashing and verifying.
+
+endmenu

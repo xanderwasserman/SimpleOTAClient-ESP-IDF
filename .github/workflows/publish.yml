@@ -1,0 +1,28 @@
+name: Publish to Espressif Component Registry (manual fallback)
+
+# Normal releases are fully automatic: bump version: in
+# simpleota/idf_component.yml, merge to main, and the Release workflow
+# tags + uploads once CI is green. This workflow exists only as a manual
+# re-run path (e.g. a transient registry outage after the tag was already
+# created, which the idempotent Release workflow would then skip).
+#
+# One-time setup: create an API token at https://components.espressif.com
+# (Tokens, "write:components" scope) and store it as the repo secret
+# IDF_COMPONENT_API_TOKEN. Registry versions are immutable: re-uploading
+# an already-published version fails.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload component
+        uses: espressif/upload-components-ci-action@v1
+        with:
+          directories: simpleota
+          name: simpleota
+          namespace: xanderwasserman
+          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}

@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  host-tests:
+    name: Host tests (signing, sha256, json)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run
+        run: make -C test/host test
+
+  build-examples:
+    name: "${{ matrix.example }} (IDF ${{ matrix.idf }}, ${{ matrix.target }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Floor and recent 5.x on the classic target.
+          - { idf: "v5.1.4", target: esp32, example: basic }
+          - { idf: "v5.1.4", target: esp32, example: signed }
+          - { idf: "v5.3.2", target: esp32, example: basic }
+          # Newest IDF across architectures (Xtensa + RISC-V).
+          - { idf: "latest", target: esp32s3, example: basic }
+          - { idf: "latest", target: esp32c3, example: basic }
+          - { idf: "latest", target: esp32c3, example: signed }
+    steps:
+      # The examples resolve the in-repo component via override_path pointing
+      # at the simpleota/ subdirectory, whose name matches the component name
+      # (the component manager resolves local dependencies by directory
+      # basename), so no special checkout path is needed.
+      - uses: actions/checkout@v4
+      - name: Build example
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ matrix.idf }}
+          target: ${{ matrix.target }}
+          path: examples/${{ matrix.example }}

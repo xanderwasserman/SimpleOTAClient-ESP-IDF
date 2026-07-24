@@ -1,0 +1,34 @@
+version: "0.1.0"
+description: "SimpleOTA managed OTA client: check, download, and flash firmware with on-the-fly SHA-256 and Ed25519 signature verification, lifecycle status reporting, and bootloader-rollback-aware trial installs."
+url: "https://github.com/xanderwasserman/SimpleOTAClient-ESP-IDF"
+repository: "https://github.com/xanderwasserman/SimpleOTAClient-ESP-IDF.git"
+documentation: "https://wiki.simpleota.com/guides/esp-idf/"
+issues: "https://github.com/xanderwasserman/SimpleOTAClient-ESP-IDF/issues"
+license: "MIT"
+tags:
+  - ota
+  - firmware-update
+  - fota
+  - ed25519
+  - simpleota
+targets:
+  - esp32
+  - esp32s2
+  - esp32s3
+  - esp32c3
+  - esp32c6
+  - esp32h2
+# Examples live at the repository root, outside this component directory.
+# (The component is nested as "simpleota/" so the examples' override_path
+# always ends in a directory named after the component, which is how the
+# component manager resolves local dependencies, regardless of what the
+# repository clone is called.)
+examples:
+  - path: "../examples/basic"
+  - path: "../examples/signed"
+# Deliberately no cJSON dependency: the bundled "json" component left the
+# IDF core in 6.0 and version-conditional manifest rules behave differently
+# across component-manager generations, so responses are parsed with the
+# same minimal scanner the Arduino client uses (src/sota_json.c).
+dependencies:
+  idf: ">=5.1"

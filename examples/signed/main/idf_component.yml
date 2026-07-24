@@ -1,0 +1,9 @@
+dependencies:
+  xanderwasserman/simpleota:
+    version: "*"
+    # Local and CI builds resolve the component from this repo checkout. The
+    # component manager matches a local dependency by the basename of this
+    # path, which is why the component lives in a directory literally named
+    # "simpleota" (the repo clone itself can be named anything). Copies of
+    # this example installed from the registry resolve the published version.
+    override_path: "../../../simpleota"

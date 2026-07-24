@@ -1,0 +1,27 @@
+# Build output
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
+
+# Host test artifacts
+test/host/*.o
+test/host/test_signing
+
+# Firmware binaries never belong in the repo
+*.bin
+*.elf
+*.map
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# compote pack output
+dist/
+# macOS / Docker bind-mount duplicates: "name 2", "name 2.ext".
+# (Patterns are globs, not shell words: a quoted pattern matches nothing.)
+* 2
+* 2.*
