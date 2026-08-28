@@ -1,0 +1,13 @@
+# QEMU fragment for classic ESP32. Not applied automatically (would break
+# real-hardware Wi-Fi builds). Use:
+#   idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.qemu" set-target esp32
+#
+# QEMU does not emulate the ESP32 Wi-Fi radio; idf.py qemu attaches
+# -nic user,model=open_eth. Hardware AES/SHA/MPI are also poorly emulated,
+# so TLS/OTA would hang unless mbedTLS uses software crypto.
+
+CONFIG_EXAMPLE_USE_OPENETH=y
+CONFIG_ETH_USE_OPENETH=y
+CONFIG_MBEDTLS_HARDWARE_AES=n
+CONFIG_MBEDTLS_HARDWARE_SHA=n
+CONFIG_MBEDTLS_HARDWARE_MPI=n

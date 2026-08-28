@@ -16,6 +16,9 @@
  *
  * The placeholder key below deliberately does NOT parse:
  * simpleota_init() fails closed rather than running unverified.
+ *
+ * QEMU has no Wi-Fi radio; use sdkconfig.defaults.qemu (OpenETH + software
+ * mbedTLS) and set the token locally via menuconfig.
  */
 
 #include <inttypes.h>
@@ -68,6 +71,9 @@ void app_main(void) {
 
     simpleota_config_t cfg = {
         .token = CONFIG_EXAMPLE_SIMPLEOTA_TOKEN,
+        /* NULL: component default (Wi-Fi STA MAC). OpenETH passes the
+         * Ethernet MAC so check-in does not depend on Wi-Fi. */
+        .device_id = example_net_device_id(),
         .board_id = "esp32-devkitc",
         .security_mode = SIMPLEOTA_SECURITY_SIGNED,
         .signing_keys = keys,

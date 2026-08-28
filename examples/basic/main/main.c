@@ -1,15 +1,16 @@
 /**
  * SimpleOTA basic example: managed OTA updates for an ESP-IDF project.
  *
- * Flow: bring up Wi-Fi, initialize SimpleOTA with a project token, start the
- * managed task. The component checks for updates on an interval, downloads
- * and flashes offered firmware (SHA-256 verified), reboots into it as a
- * bootloader-supervised trial, and confirms it on the first successful
- * check-in after boot. If the new image crashes or never confirms, the
- * bootloader rolls back to this image.
+ * Flow: bring up Wi-Fi (or OpenETH in QEMU), initialize SimpleOTA with a
+ * project token, start the managed task. The component checks for updates
+ * on an interval, downloads and flashes offered firmware (SHA-256 verified),
+ * reboots into it as a bootloader-supervised trial, and confirms it on the
+ * first successful check-in after boot. If the new image crashes or never
+ * confirms, the bootloader rolls back to this image.
  *
- * Configure Wi-Fi credentials and the token via `idf.py menuconfig`
- * (Example Configuration).
+ * Configure Wi-Fi credentials (or OpenETH) and the token via
+ * `idf.py menuconfig` (Example Configuration). QEMU has no Wi-Fi radio;
+ * see sdkconfig.defaults.qemu.
  */
 
 #include <inttypes.h>
@@ -58,7 +59,7 @@ static void on_ota_event(const simpleota_event_t *evt, void *ctx) {
 }
 
 void app_main(void) {
-    /* NVS is required (Wi-Fi calibration + SimpleOTA state). */
+    /* NVS is required (Wi-Fi calibration on hardware + SimpleOTA state). */
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES ||
         err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -71,7 +72,9 @@ void app_main(void) {
 
     simpleota_config_t cfg = {
         .token = CONFIG_EXAMPLE_SIMPLEOTA_TOKEN,
-        /* device_id defaults to the Wi-Fi MAC; chip_family to this target. */
+        /* NULL: component default (Wi-Fi STA MAC). OpenETH passes the
+         * Ethernet MAC so check-in does not depend on Wi-Fi. */
+        .device_id = example_net_device_id(),
         .board_id = "esp32-devkitc",
         .check_interval_s = 300, /* fast-ish for a demo; default is 3600 */
         .event_cb = on_ota_event,

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Examples: optional OpenETH + DHCP path (`CONFIG_EXAMPLE_USE_OPENETH`) so
+  classic ESP32 QEMU can reach a real SimpleOTA check-in. Wi-Fi STA remains
+  the default; OpenETH sdkconfig flags and software mbedTLS are confined to
+  `sdkconfig.defaults.qemu` and are not applied to hardware builds.
+
 ## 0.1.0 (released)
 
 Initial release.

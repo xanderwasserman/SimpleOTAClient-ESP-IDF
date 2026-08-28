@@ -15,6 +15,8 @@ rendered on the registry page).
 Complete example projects: [examples/basic](examples/basic) and
 [examples/signed](examples/signed). The examples build against the in-repo
 component via a local override, so they always exercise the checked-out code.
+QEMU has no Wi-Fi; see [simpleota/README.md](simpleota/README.md#qemu-no-wi-fi)
+for the OpenETH path.
 
 New to ESP-IDF, or want to test on real hardware? See
 [docs/hardware-testing.md](docs/hardware-testing.md) for a full

@@ -189,6 +189,13 @@ to the previous working build, reported in the dashboard as `rolled_back`
 / `boot_failed` (see the main [README](../simpleota/README.md#rollback) for
 what the different rollback reasons mean).
 
+## 11. Testing in QEMU (optional)
+
+QEMU does not emulate the ESP32 Wi-Fi radio, so the default Wi-Fi path
+hangs at connecting. Use the OpenETH fragment and `idf.py qemu monitor`
+instead. Steps: [simpleota/README.md](../simpleota/README.md#qemu-no-wi-fi).
+The token stays in local `sdkconfig`; this repo does not ship one.
+
 ## Getting back to Arduino
 
 Reflash your Arduino sketch the normal way (Arduino IDE or arduino-cli). It
@@ -206,4 +213,5 @@ toolchain.
 | `idf.py build` | Compile only |
 | `idf.py -p /dev/cu.usbserial-XXXX flash monitor` | Flash + watch logs |
 | `idf.py monitor` | Reattach the log viewer (board already flashed) |
+| `idf.py qemu monitor` | Run the OpenETH QEMU build (see [simpleota/README.md](../simpleota/README.md#qemu-no-wi-fi); QEMU has no Wi-Fi) |
 | `Ctrl + ]` | Exit the log viewer |

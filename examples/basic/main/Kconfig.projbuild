@@ -1,18 +1,36 @@
 menu "Example Configuration"
 
+config EXAMPLE_USE_OPENETH
+    bool "Use OpenETH instead of Wi-Fi (QEMU)"
+    default n
+    depends on IDF_TARGET_ESP32
+    select ETH_USE_OPENETH
+    help
+        Espressif QEMU does not emulate the ESP32 Wi-Fi radio; idf.py qemu
+        attaches -nic user,model=open_eth. Enable this to bring up the
+        OpenCores Ethernet MAC with DHCP instead of Wi-Fi STA.
+
+        Do not enable on real hardware. QEMU also does not emulate AES/SHA
+        hardware well: apply sdkconfig.defaults.qemu (or menuconfig) to
+        force software mbedTLS. Set the SimpleOTA token locally; it is not
+        stored in the repo.
+
 config EXAMPLE_WIFI_SSID
     string "Wi-Fi SSID"
     default "myssid"
+    depends on !EXAMPLE_USE_OPENETH
 
 config EXAMPLE_WIFI_PASSWORD
     string "Wi-Fi password"
     default "mypassword"
+    depends on !EXAMPLE_USE_OPENETH
 
 config EXAMPLE_SIMPLEOTA_TOKEN
     string "SimpleOTA project token"
     default "paste-your-project-token"
     help
         Create a project at https://simpleota.com, then copy a project API
-        token with the device scope (Project -> API tokens).
+        token with the device scope (Project -> API tokens). Keep this in
+        local sdkconfig; do not commit a real token.
 
 endmenu

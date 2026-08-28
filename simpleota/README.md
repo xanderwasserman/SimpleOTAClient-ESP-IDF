@@ -218,6 +218,36 @@ Both are complete projects (`idf.py menuconfig` for Wi-Fi + token, then
 local override that works from any clone directory name (the component lives
 in the `simpleota/` subdirectory precisely so the override resolves).
 
+### QEMU (no Wi-Fi)
+
+Espressif QEMU (`qemu-system-xtensa`, machine `esp32`) does not emulate the
+ESP32 Wi-Fi radio. `idf.py qemu` already attaches `-nic user,model=open_eth`.
+The default example path still calls `example_wifi_connect()` and waits for
+a Wi-Fi IP, so a stock build hangs at connecting and never reaches
+SimpleOTA.
+
+Keep real-hardware Wi-Fi as the default. For QEMU, apply the OpenETH
+fragment (enables `CONFIG_EXAMPLE_USE_OPENETH`, OpenCores Ethernet + DHCP,
+and software mbedTLS because QEMU does not emulate AES/SHA hardware well).
+Set the project token locally; do not put a real token in the repo.
+
+```sh
+. ~/esp/esp-idf/export.sh
+cd examples/basic          # or examples/signed
+idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.qemu" set-target esp32
+idf.py menuconfig          # Example Configuration -> SimpleOTA project token
+idf.py qemu monitor
+```
+
+You should see OpenETH get a DHCP address, then a real HTTPS check-in
+(`check: no update` / `up_to_date`, or an offered build). The signed example
+still requires a real public key PEM; the placeholder fails closed.
+
+Equivalent menuconfig without the fragment: Example Configuration -> Use
+OpenETH instead of Wi-Fi (QEMU); Component config -> Ethernet -> Support
+OpenCores Ethernet MAC; Component config -> mbedTLS -> disable hardware
+AES, SHA, and MPI. Do not enable OpenETH on a real chip.
+
 New to ESP-IDF, or testing on real hardware for the first time? See
 [docs/hardware-testing.md](../docs/hardware-testing.md) for a full
 install-to-first-OTA walkthrough.
