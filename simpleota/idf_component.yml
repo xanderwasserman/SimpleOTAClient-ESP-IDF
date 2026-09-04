@@ -1,5 +1,5 @@
 version: "0.1.0"
-description: "SimpleOTA managed OTA client: check, download, and flash firmware with on-the-fly SHA-256 and Ed25519 signature verification, lifecycle status reporting, and bootloader-rollback-aware trial installs."
+description: "Managed ESP32 fleet OTA with canary rollouts, on-device Ed25519 verify, and automatic rollback. Arduino, PlatformIO, ESP-IDF."
 url: "https://github.com/xanderwasserman/SimpleOTAClient-ESP-IDF"
 repository: "https://github.com/xanderwasserman/SimpleOTAClient-ESP-IDF.git"
 documentation: "https://wiki.simpleota.com/guides/esp-idf/"
