@@ -17,8 +17,8 @@ You upload a .bin from PlatformIO, ESP-IDF, Arduino, or CI, and devices check in
 
 Signing here protects the delivery path. It is not Secure Boot. They stack if you already use Secure Boot.
 
-Quickstart (project, client, first update): https://wiki.simpleota.com/getting-started/?utm_source=idf_registry&utm_medium=readme&utm_campaign=signup_v1
-Site: https://simpleota.com/?utm_source=idf_registry&utm_medium=readme&utm_campaign=signup_v1
+[Quickstart (project, client, first update)](https://wiki.simpleota.com/getting-started/?utm_source=idf_registry&utm_medium=readme&utm_campaign=signup_v1)
+[Site](https://simpleota.com/?utm_source=idf_registry&utm_medium=readme&utm_campaign=signup_v1)
 
 ## Install
 
