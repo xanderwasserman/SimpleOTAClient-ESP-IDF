@@ -4,6 +4,8 @@ First-party ESP-IDF component for the [SimpleOTA](https://simpleota.com)
 firmware update platform, published to the Espressif Component Registry as
 [`xanderwasserman/simpleota`](https://components.espressif.com/components/xanderwasserman/simpleota).
 
+Managed fleet OTA for ESP32 devices in the field: https://simpleota.com/?utm_source=idf_registry&utm_medium=readme&utm_campaign=signup_v1
+
 ```sh
 idf.py add-dependency "xanderwasserman/simpleota"
 ```
