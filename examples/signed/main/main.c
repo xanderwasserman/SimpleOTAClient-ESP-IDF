@@ -58,8 +58,6 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(err);
 
-    ESP_ERROR_CHECK(example_wifi_connect());
-
     const simpleota_signing_key_t keys[] = {
         {.key_id = NULL, .pem = SIGNING_PUBLIC_KEY_PEM},
         /* During key rotation, pin the old and the new key side by side:
@@ -90,6 +88,8 @@ void app_main(void) {
         }
     }
     ESP_ERROR_CHECK(simpleota_start());
+
+    ESP_ERROR_CHECK(example_wifi_connect());
 
     ESP_LOGI(TAG, "running build %" PRIu32 "; signed OTA task started",
              simpleota_current_build());

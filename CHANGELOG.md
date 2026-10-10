@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0
+
+On a SimpleOTA trial boot, `simpleota_init()` arms the chip's RTC or LP
+watchdog for the confirm timeout plus a margin (the larger of 60 seconds
+and 10 percent), using the calibrated slow clock. A hang that stops both
+cores still resets the chip, the bootloader switches back, and the
+`rolled_back` report carries reason `watchdog`. Confirm and the
+component's own rollback both disable that watchdog. Other boots leave it
+alone. `CONFIG_SIMPLEOTA_DISABLE_TRIAL_WATCHDOG` turns the watchdog off
+while the confirm timer stays in place.
+
 ## 0.1.0 (released)
 
 Initial release.

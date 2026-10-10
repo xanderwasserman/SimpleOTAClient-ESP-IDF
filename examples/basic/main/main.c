@@ -1,12 +1,13 @@
 /**
  * SimpleOTA basic example: managed OTA updates for an ESP-IDF project.
  *
- * Flow: bring up Wi-Fi, initialize SimpleOTA with a project token, start the
- * managed task. The component checks for updates on an interval, downloads
- * and flashes offered firmware (SHA-256 verified), reboots into it as a
- * bootloader-supervised trial, and confirms it on the first successful
- * check-in after boot. If the new image crashes or never confirms, the
- * bootloader rolls back to this image.
+ * Flow: initialize NVS, start SimpleOTA, then bring up Wi-Fi. Init runs
+ * before Wi-Fi so a trial boot arms the chip watchdog and the confirm
+ * timer before network bring-up. The component checks for updates on an
+ * interval, downloads and flashes offered firmware (SHA-256 verified),
+ * reboots into it as a bootloader-supervised trial, and confirms it on
+ * the first successful check-in after boot. If the new image crashes,
+ * hangs, or never confirms, the bootloader rolls back to this image.
  *
  * Configure Wi-Fi credentials and the token via `idf.py menuconfig`
  * (Example Configuration).
@@ -67,8 +68,6 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(err);
 
-    ESP_ERROR_CHECK(example_wifi_connect());
-
     simpleota_config_t cfg = {
         .token = CONFIG_EXAMPLE_SIMPLEOTA_TOKEN,
         /* device_id defaults to the Wi-Fi MAC; chip_family to this target. */
@@ -79,6 +78,8 @@ void app_main(void) {
     };
     ESP_ERROR_CHECK(simpleota_init(&cfg));
     ESP_ERROR_CHECK(simpleota_start());
+
+    ESP_ERROR_CHECK(example_wifi_connect());
 
     ESP_LOGI(TAG, "running build %" PRIu32 "; OTA task started",
              simpleota_current_build());
