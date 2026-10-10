@@ -19,8 +19,8 @@
  *   sota_fail_build u32   build number for that report
  *   sota_conf_pend  u8    1 when a "confirmed" report has not been accepted yet
  *   sota_rb_reason  str   reason token recorded when a rollback is detected
- *                         ("confirm_timeout" or "boot_failed"); reported with
- *                         the deferred rolled_back event
+ *                         ("confirm_timeout", "watchdog", or "boot_failed");
+ *                         reported with the deferred rolled_back event
  */
 
 #ifndef SOTA_NVS_H

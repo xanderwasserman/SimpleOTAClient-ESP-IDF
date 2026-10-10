@@ -1,0 +1,4 @@
+dependencies:
+  xanderwasserman/simpleota:
+    version: "*"
+    override_path: "../../../simpleota"

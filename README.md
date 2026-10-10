@@ -12,7 +12,10 @@ idf.py add-dependency "xanderwasserman/simpleota"
 
 Full documentation (features, configuration, signed firmware, rollback):
 **[simpleota/README.md](simpleota/README.md)** (the component itself, also
-rendered on the registry page).
+rendered on the registry page). On a trial boot the component arms the
+chip's RTC or LP watchdog for the confirm timeout plus a margin, so a hang
+that stops the confirm timer still resets the chip and the bootloader
+switches back.
 
 Complete example projects: [examples/basic](examples/basic) and
 [examples/signed](examples/signed). The examples build against the in-repo
