@@ -127,20 +127,22 @@ typedef struct {
 
 /**
  * Initialize the component: copy config, apply defaults, parse and pin
- * signing keys, load persisted state, and run boot-time trial validation
- * (detects rollbacks, arms the confirm timeout for trial boots).
+ * signing keys, load persisted state, and run boot-time trial validation.
+ * On a pending trial this arms the confirm timer and the chip RTC/LP
+ * watchdog (confirm timeout plus a margin).
  *
- * Call AFTER nvs_flash_init(). Returns ESP_ERR_INVALID_ARG for a missing
- * token, an unparseable signing key, or a token containing control
- * characters; ESP_ERR_INVALID_STATE when already initialized or when
- * neither the certificate bundle nor a cert_pem is available.
+ * Call AFTER nvs_flash_init(), and before other bring-up when you can:
+ * the chip watchdog starts in this call. Returns ESP_ERR_INVALID_ARG for
+ * a missing token, an unparseable signing key, or a token containing
+ * control characters; ESP_ERR_INVALID_STATE when already initialized or
+ * when neither the certificate bundle nor a cert_pem is available.
  */
 esp_err_t simpleota_init(const simpleota_config_t *config);
 
 /** Start the managed background task (check on interval, apply, report).
- *  Call promptly after simpleota_init(): on a trial boot the confirm-timeout
- *  rollback is executed by this task, so supervision is inactive until it
- *  runs. */
+ *  The chip watchdog armed by simpleota_init does not depend on this task.
+ *  The confirm timer does: this task marks the image invalid when that
+ *  timer fires. */
 esp_err_t simpleota_start(void);
 
 /** Stop the managed task. Blocks briefly; never interrupts a flash write. */
@@ -151,8 +153,9 @@ esp_err_t simpleota_check_now(void);
 
 /**
  * Confirm the currently running trial image (manual_confirm mode, called
- * after the app's own health checks pass). Cancels rollback, reports
- * "confirmed". No-op when not in a trial boot.
+ * after the app's own health checks pass). Disables the chip watchdog,
+ * marks the image valid, and cancels the confirm timer. No-op when not
+ * in a trial boot.
  */
 esp_err_t simpleota_confirm(void);
 
