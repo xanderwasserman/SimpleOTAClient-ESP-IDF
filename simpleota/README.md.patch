@@ -1,0 +1,128 @@
+--- a/simpleota/README.md
++++ b/simpleota/README.md
+@@ -13,7 +13,7 @@
+ 
+ Local OTA (ArduinoOTA, espota, ElegantOTA) is for a board on your desk. SimpleOTA is managed fleet OTA for ESP32 when those devices are in the field, without pulling you into a full IoT platform.
+ 
+-You upload a .bin from PlatformIO, ESP-IDF, Arduino, or CI, and devices check in on their own. Eligible ones get a short-lived pre-signed URL and pull firmware straight from object storage. Rollouts can start at 5% with deterministic bucketing, so the same unit stays in the same cohort. Builds can be Ed25519-signed and verified on the device during download, before the new partition is marked bootable. After reboot there's a trial window: crash or no successful check-in, and the device rolls back.
++You upload a .bin from PlatformIO, ESP-IDF, Arduino, or CI, and devices check in on their own. Eligible ones get a short-lived pre-signed URL and pull firmware straight from object storage. Rollouts can start at 5% with deterministic bucketing, so the same unit stays in the same cohort. Builds can be Ed25519-signed and verified on the device during download, before the new partition is marked bootable. After the reboot, the new firmware runs on trial until the first successful check-in, or until your code calls `simpleota_confirm()` when manual confirm is on. A crash or a power loss before that returns the board to the previous firmware, and if the confirm time runs out the component switches back itself. If the new firmware hangs during that trial, a watchdog on the chip's slow clock resets the board so the bootloader can still switch back.
+ 
+ Signing here protects the delivery path. It is not Secure Boot. They stack if you already use Secure Boot.
+ 
+@@ -51,7 +51,9 @@
+ #include "simpleota.h"
+ 
+ void app_main(void) {
+-    // nvs_flash_init() + your Wi-Fi bring-up first...
++    // nvs_flash_init() first. Call simpleota_init() before other bring-up
++    // so a trial arms the chip watchdog immediately. Wi-Fi can follow;
++    // the task waits on is_connected.
+ 
+     simpleota_config_t cfg = {
+         .token = "YOUR_PROJECT_TOKEN",   // Project -> API tokens (device scope)
+@@ -95,7 +97,10 @@
+ 
+ Build-time knobs (menuconfig, "SimpleOTA"): task stack size (12288),
+ priority (5), HTTP timeout (15 s), HTTP TX buffer (2048 -- must fit the long
+-pre-signed download URLs), download chunk size (4096).
++pre-signed download URLs), download chunk size (4096). The same menu has
++`SIMPLEOTA_DISABLE_TRIAL_WATCHDOG`, which is off unless you turn it on.
++Turning it on leaves the chip watchdog alone during a trial. The confirm
++timer still runs.
+ 
+ ## Update lifecycle
+ 
+@@ -117,23 +122,67 @@
+ as PENDING_VERIFY: the **bootloader itself** guarantees one attempt. If the
+ image crashes or loses power before confirmation, the next boot returns to
+ the previous app. On top of that, the component runs a confirm timeout
+-(default 300 s): if the new image runs but never completes a successful
+-check-in, it is marked invalid and the device reboots into the previous
+-build, reporting `rolled_back` / `confirm_timeout`.
++(default 300 s, `confirm_timeout_s`). If the new image runs but never
++completes a successful check-in, the component marks it invalid and the
++device reboots into the previous build, reporting `rolled_back` with
++reason `confirm_timeout`.
++
++During that pending trial, `simpleota_init()` also starts the chip's RTC
++or LP watchdog, for the confirm timeout plus a margin. The margin is the
++larger of 60 seconds and 10 percent of the confirm timeout, and the stage
++value comes from the calibrated slow clock (`esp_clk_slowclk_cal_get()`,
++falling back to `rtc_clk_slow_freq_get_hz()` when the calibration is 0).
++The watchdog runs on its own clock, so a hang that stops both cores, and
++therefore stops the confirm `esp_timer`, still resets the chip. The
++bootloader then switches back, and the next boot reports `rolled_back`
++with reason `watchdog`. `simpleota_confirm()`, and the automatic confirm
++on the first successful check-in, both disable that watchdog. The
++component's own timeout rollback disables it before the reboot, so that
++reboot stays `confirm_timeout`. A boot that is not a pending SimpleOTA
++trial does not touch the watchdog, and neither does a plain image.
++
++Call `simpleota_init()` as soon as NVS is ready. That is when the watchdog
++starts. The examples do this before Wi-Fi, then call `simpleota_start()`
++so the confirm timer has a task to run on while the network comes up.
++`CONFIG_SIMPLEOTA_DISABLE_TRIAL_WATCHDOG` skips the watchdog and leaves
++the confirm timer in place. If a target's build has no `hal/wdt_hal.h`,
++the component skips the arm and logs that a hang during the trial is not
++reset by it. A crash still switches back through the bootloader when
++rollback is enabled.
++
++At the usual internal slow clock the stage can wait at most about 8 hours
++on the original ESP32, about 9 hours on the S3, C3, C6, and H2, and about
++13 hours on the S2. A longer `confirm_timeout_s` still sets the confirm
++timer to the time you asked for, and the chip watchdog fires at its
++maximum. Light sleep pauses this watchdog, because `wdt_hal_init` enables
++pause-in-sleep. Deep sleep does not pause it, so a trial that enters deep
++sleep can still be reset when the deadline passes.
++
++| Chip | Peripheral | What this component calls |
++|---|---|---|
++| ESP32, S2, S3, C3 | RTC watchdog (`RTCCNTL`) | `wdt_hal` `WDT_RWDT`, stage 0 action `WDT_STAGE_ACTION_RESET_RTC` |
++| ESP32-C6, H2 | LP watchdog, HAL name RWDT | the same `wdt_hal` `WDT_RWDT` calls |
++
++C2 uses that same RTC watchdog, and C5 and P4 use the LP watchdog under the
++same `WDT_RWDT` name. Those three are not in this component's published
++target list. The source does not special-case the chip: any target whose
++IDF provides `hal/wdt_hal.h` gets this sequence.
+ 
+ After any rollback the component restores the previous build number in NVS,
+ so the dashboard sees the truth and the server can re-offer fixed builds. The
+ `rolled_back` report carries the detected cause: `confirm_timeout` when the
+-component's own supervision marked the image invalid, `boot_failed` when the
+-bootloader rejected or abandoned the image (crash loop, power loss during
+-the trial, image-verification or Secure Boot rejection). Note that even
+-without `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, a corrupt image can be
+-refused by the bootloader's basic image verification and will then surface
+-as `rolled_back` / `boot_failed`.
++component's own supervision marked the image invalid, `watchdog` when the
++reset reason is the chip watchdog (`ESP_RST_WDT`), and `boot_failed` when
++the bootloader rejected or abandoned the image for another reason (crash
++loop, power loss during the trial, image-verification or Secure Boot
++rejection). Even without `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, a corrupt
++image can be refused by the bootloader's basic image verification and will
++then surface as `rolled_back` / `boot_failed`.
+ 
+ Confirmation is automatic on the first successful check-in. If your
+ application has its own health checks, set `.manual_confirm = true` and call
+-`simpleota_confirm()` once they pass.
++`simpleota_confirm()` once they pass. During a trial this component is using
++the chip watchdog, so start your own use of that watchdog after confirm.
+ 
+ ## Signed firmware
+ 
+@@ -237,8 +286,13 @@
+ verification, SHA-256, the signed-firmware gate, response parsing) on the
+ host with plain cc: RFC 8032 vectors, NIST SHA-256 vectors, a vector
+ generated by the actual SimpleOTA server stack, tamper/wrong-key/truncation
+-negatives, key rotation, and the full gate truth table. CI builds both
+-examples across IDF v5.1 through latest on Xtensa and RISC-V targets.
++negatives, key rotation, and the full gate truth table. The same run checks
++the trial watchdog margin, the calibrated slow-clock tick conversion, and
++the `watchdog` rollback reason. CI builds the examples on IDF v5.1, v5.2,
++v5.3, v5.4, v5.5, and latest, covering each published target, and checks
++that the watchdog object references `wdt_hal_init` unless
++`SIMPLEOTA_DISABLE_TRIAL_WATCHDOG` is set. `examples/compile_check` is the
++build used for the ESP32-H2, which has no Wi-Fi radio.
+ 
+ ## License
+ 

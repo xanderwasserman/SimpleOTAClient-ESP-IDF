@@ -1,0 +1,74 @@
+--- a/simpleota/src/simpleota.c
++++ b/simpleota/src/simpleota.c
+@@ -43,6 +43,7 @@
+ #include "sota_nvs.h"
+ #include "sota_sha256.h"
+ #include "sota_signing.h"
++#include "sota_wdt.h"
+ 
+ static const char *TAG = "simpleota";
+ 
+@@ -386,6 +387,7 @@
+ static void do_confirm(void) {
+     if (!s.in_trial) return;
+     s.in_trial = false; /* first: disarms a racing timeout callback */
++    sota_wdt_disarm();
+ 
+ #if CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+     /* Local operation; cannot fail on network. Seals the bootloader state. */
+@@ -408,6 +410,7 @@
+ static void do_rollback_from_timeout(void) {
+     if (!s.in_trial) return; /* confirmed in the meantime */
+     s.in_trial = false;
++    sota_wdt_disarm();
+ 
+     ESP_LOGW(TAG, "confirm timeout: rolling back to build %" PRIu32,
+              s.nvs.prev_build);
+@@ -487,6 +490,9 @@
+                          (int)state);
+             }
+             s.in_trial = true;
++            if (state == ESP_OTA_IMG_PENDING_VERIFY) {
++                sota_wdt_arm(s.confirm_timeout_s);
++            }
+             if (arm_confirm_timer() != ESP_OK) {
+                 /* Cannot supervise the trial: fail safe by rolling back now
+                  * rather than running unconfirmed forever. */
+@@ -511,13 +517,7 @@
+             s.nvs.trial = 0;
+ #endif
+         } else {
+-            /* We are NOT on the image we flashed: the bootloader rolled back
+-             * (crash/power loss during trial), the mark-invalid path ran, or
+-             * the bootloader's image verification / Secure Boot rejected the
+-             * image so the switch never happened. Distinguish the cause where
+-             * the otadata state allows it; "boot_failed" covers everything
+-             * that was not our own confirm-timeout mark-invalid. */
+-            const char *cause = "boot_failed";
++            bool image_invalid = false;
+ #if CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+             const esp_partition_t *new_part =
+                 find_app_partition_by_addr(s.nvs.new_part);
+@@ -525,11 +525,12 @@
+                 esp_ota_img_states_t st = ESP_OTA_IMG_UNDEFINED;
+                 if (esp_ota_get_state_partition(new_part, &st) == ESP_OK &&
+                     st == ESP_OTA_IMG_INVALID) {
+-                    /* Only our own mark-invalid path produces INVALID. */
+-                    cause = "confirm_timeout";
++                    image_invalid = true;
+                 }
+             }
+ #endif
++            const char *cause =
++                sota_rollback_cause(image_invalid, (int)esp_reset_reason());
+             ESP_LOGW(TAG,
+                      "rollback detected (%s): running 0x%" PRIx32
+                      " but new image was at 0x%" PRIx32,
+@@ -1277,6 +1278,7 @@
+ 
+ esp_err_t simpleota_deinit(void) {
+     if (s.task) simpleota_stop();
++    sota_wdt_disarm();
+     stop_confirm_timer();
+     clear_offer();
+     free(s.token);

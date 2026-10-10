@@ -1,0 +1,35 @@
+name: Apply trial source
+
+on:
+  push:
+    branches: [agent-trial-watchdog-d596]
+    paths: [.github/workflows/apply-trial-source.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent-trial-watchdog-d596
+          fetch-depth: 0
+      - name: Restore files from main and apply the trial watchdog edits
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git show origin/main:simpleota/src/simpleota.c > simpleota/src/simpleota.c
+          git show origin/main:simpleota/README.md > simpleota/README.md
+          patch -p1 < simpleota/src/simpleota.c.patch
+          patch -p1 < simpleota/README.md.patch
+          echo "a27ed1ec6191f1ac8a40cf6eaead523433792aecc9386e1a19a7ba7052c8e504  simpleota/src/simpleota.c" | sha256sum -c
+          echo "8a69571f9ac0f2452e6522af0024523c601e1830ba87050622fc04a51b779728  simpleota/README.md" | sha256sum -c
+          rm -f simpleota/src/simpleota.c.patch simpleota/README.md.patch .github/workflows/apply-trial-source.yml
+          git config user.name "Alexander Wasserman"
+          git config user.email "61466759+xanderwasserman@users.noreply.github.com"
+          git add simpleota/src/simpleota.c simpleota/README.md simpleota/src/simpleota.c.patch simpleota/README.md.patch .github/workflows/apply-trial-source.yml
+          git diff --cached --stat
+          git commit -m "Arm and disarm the chip watchdog on the trial path."
+          git push origin HEAD:agent-trial-watchdog-d596
