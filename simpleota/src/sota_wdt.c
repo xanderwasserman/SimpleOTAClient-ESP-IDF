@@ -12,10 +12,6 @@
 
 #include "sota_wdt.h"
 
-#include "esp_log.h"
-
-static const char *TAG = "simpleota";
-
 #if defined(CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE) && !CONFIG_SIMPLEOTA_DISABLE_TRIAL_WATCHDOG
 #define SOTA_WDT_WANTED 1
 #else
@@ -34,6 +30,12 @@ static const char *TAG = "simpleota";
 #endif
 #else
 #define SOTA_WDT_HW 0
+#endif
+
+#if SOTA_WDT_WANTED && !SOTA_WDT_HW
+#include "esp_log.h"
+
+static const char *TAG = "simpleota";
 #endif
 
 static bool s_armed;

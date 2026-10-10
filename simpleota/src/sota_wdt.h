@@ -49,8 +49,9 @@ static inline uint32_t sota_nominal_slow_ticks(uint64_t seconds, uint32_t hz)
  * Cause stored with a rolled_back report when this boot is running a
  * different image than the one the trial flashed.
  *
- * image_invalid: this component marked the new slot invalid.
- * A chip-watchdog reset is "watchdog". Every other abandon is "boot_failed".
+ * image_invalid is true when the new slot is in the INVALID state, which
+ * only the component's confirm-timeout path sets: "confirm_timeout".
+ * A chip-watchdog reset: "watchdog". Anything else: "boot_failed".
  */
 static inline const char *sota_rollback_cause(bool image_invalid, int reset_code)
 {

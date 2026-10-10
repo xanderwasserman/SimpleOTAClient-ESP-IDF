@@ -525,6 +525,7 @@ static void process_boot_validation(void) {
                 esp_ota_img_states_t st = ESP_OTA_IMG_UNDEFINED;
                 if (esp_ota_get_state_partition(new_part, &st) == ESP_OK &&
                     st == ESP_OTA_IMG_INVALID) {
+                    /* Only the confirm-timeout path marks the slot INVALID. */
                     image_invalid = true;
                 }
             }
