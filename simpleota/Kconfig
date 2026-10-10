@@ -40,4 +40,15 @@ config SIMPLEOTA_DOWNLOAD_CHUNK
         Heap-allocated buffer used to stream the firmware image from the
         HTTP client into the OTA partition while hashing and verifying.
 
+config SIMPLEOTA_DISABLE_TRIAL_WATCHDOG
+    bool "Leave the chip watchdog alone during a trial"
+    default n
+    depends on BOOTLOADER_APP_ROLLBACK_ENABLE
+    help
+        On a trial boot the component starts the chip's RTC or LP watchdog
+        for the confirm timeout plus a margin, so a hang that stops the
+        confirm timer still resets the chip and the bootloader switches
+        back. Enable this to skip that watchdog. The confirm timer still
+        runs, and a crash still switches back through the bootloader.
+
 endmenu

@@ -8,7 +8,7 @@ on:
 
 jobs:
   host-tests:
-    name: Host tests (signing, sha256, json)
+    name: Host tests (signing, sha256, json, watchdog)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,25 +16,26 @@ jobs:
         run: make -C test/host test
 
   build-examples:
-    name: "${{ matrix.example }} (IDF ${{ matrix.idf }}, ${{ matrix.target }})"
+    name: "${{ matrix.example }} (IDF ${{ matrix.idf }}, ${{ matrix.target }}, ${{ matrix.wdt }})"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Floor and recent 5.x on the classic target.
-          - { idf: "v5.1.4", target: esp32, example: basic }
-          - { idf: "v5.1.4", target: esp32, example: signed }
-          - { idf: "v5.3.2", target: esp32, example: basic }
-          # Newest IDF across architectures (Xtensa + RISC-V).
-          - { idf: "latest", target: esp32s3, example: basic }
-          - { idf: "latest", target: esp32c3, example: basic }
-          - { idf: "latest", target: esp32c3, example: signed }
+          - { idf: "v5.1.4", target: esp32, example: basic, wdt: require }
+          - { idf: "v5.1.4", target: esp32, example: signed, wdt: require }
+          - { idf: "v5.1.4", target: esp32c3, example: basic, wdt: require }
+          - { idf: "v5.2.8", target: esp32s2, example: basic, wdt: require }
+          - { idf: "v5.3.2", target: esp32, example: basic, wdt: require }
+          - { idf: "v5.3.2", target: esp32h2, example: compile_check, wdt: require }
+          - { idf: "v5.4.4", target: esp32c6, example: basic, wdt: require }
+          - { idf: "v5.4.4", target: esp32c6, example: basic, wdt: absent }
+          - { idf: "v5.5.5", target: esp32s3, example: basic, wdt: require }
+          - { idf: "latest", target: esp32s3, example: basic, wdt: require }
+          - { idf: "latest", target: esp32c3, example: basic, wdt: require }
+          - { idf: "latest", target: esp32c3, example: signed, wdt: require }
+          - { idf: "latest", target: esp32h2, example: compile_check, wdt: require }
     steps:
-      # The examples resolve the in-repo component via override_path pointing
-      # at the simpleota/ subdirectory, whose name matches the component name
-      # (the component manager resolves local dependencies by directory
-      # basename), so no special checkout path is needed.
       - uses: actions/checkout@v4
       - name: Build example
         uses: espressif/esp-idf-ci-action@v1
@@ -42,3 +43,4 @@ jobs:
           esp_idf_version: ${{ matrix.idf }}
           target: ${{ matrix.target }}
           path: examples/${{ matrix.example }}
+          command: bash ../../.github/ci_build.sh ${{ matrix.wdt }}

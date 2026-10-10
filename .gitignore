@@ -8,6 +8,7 @@ dependencies.lock
 # Host test artifacts
 test/host/*.o
 test/host/test_signing
+test/host/test_wdt
 
 # Firmware binaries never belong in the repo
 *.bin
