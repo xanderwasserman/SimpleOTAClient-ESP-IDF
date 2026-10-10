@@ -1,7 +1,5 @@
 /**
  * sota_wdt.h - trial watchdog deadline and rolled_back cause.
- *
- * No ESP-IDF types. sota_wdt.c arms the chip watchdog.
  */
 
 #ifndef SOTA_WDT_H
