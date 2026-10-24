@@ -1,0 +1,21 @@
+# Two 1700K OTA app slots and no factory partition (partitions.csv). The
+# partition table ships with the FIRST serial flash and cannot change over OTA.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+# Bootloader-supervised trial boots: a new image gets exactly one attempt
+# until confirmed. Must ship with the FIRST serial flash; the bootloader
+# cannot be updated over OTA.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+# The partition table needs 4MB of flash.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+# Size-optimized builds leave more of each app slot for the application.
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# A TLS handshake is a synchronous, CPU-bound operation inside mbedTLS: the
+# OTA task cannot yield while the certificate chain is verified, so the
+# priority-0 IDLE task can be starved for longer than the default 5 s task
+# watchdog window (most visible on the classic ESP32 at 160 MHz, where the
+# first handshake after boot is the slowest). That surfaces as a harmless but
+# alarming "task_wdt: ... IDLE" warning. Widen the window rather than
+# disabling the watchdog, so genuine hangs are still caught.
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=30

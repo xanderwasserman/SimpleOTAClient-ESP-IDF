@@ -1,9 +1,9 @@
-version: "0.2.1"
+version: "1.0.0"
 description: "Managed ESP32 fleet OTA with canary rollouts, on-device Ed25519 verify, and automatic rollback. Arduino, PlatformIO, ESP-IDF."
-url: "https://github.com/xanderwasserman/SimpleOTAClient-ESP-IDF"
-repository: "https://github.com/xanderwasserman/SimpleOTAClient-ESP-IDF.git"
+url: "https://github.com/wassie-dev/simpleOTAClient-ESP-IDF"
+repository: "https://github.com/wassie-dev/simpleOTAClient-ESP-IDF.git"
 documentation: "https://wiki.simpleota.com/guides/esp-idf/"
-issues: "https://github.com/xanderwasserman/SimpleOTAClient-ESP-IDF/issues"
+issues: "https://github.com/wassie-dev/simpleOTAClient-ESP-IDF/issues"
 license: "MIT"
 tags:
   - ota
@@ -25,10 +25,11 @@ targets:
 # repository clone is called.)
 examples:
   - path: "../examples/basic"
+  - path: "../examples/polling"
   - path: "../examples/signed"
 # Deliberately no cJSON dependency: the bundled "json" component left the
 # IDF core in 6.0 and version-conditional manifest rules behave differently
 # across component-manager generations, so responses are parsed with the
-# same minimal scanner the Arduino client uses (src/sota_json.c).
+# core's own minimal scanner (src/core/sota_json.c).
 dependencies:
   idf: ">=5.1"

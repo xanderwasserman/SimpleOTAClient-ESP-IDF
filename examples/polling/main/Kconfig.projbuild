@@ -1,0 +1,18 @@
+menu "Example Configuration"
+
+config EXAMPLE_WIFI_SSID
+    string "Wi-Fi SSID"
+    default "myssid"
+
+config EXAMPLE_WIFI_PASSWORD
+    string "Wi-Fi password"
+    default "mypassword"
+
+config EXAMPLE_SIMPLEOTA_TOKEN
+    string "SimpleOTA project token"
+    default "paste-your-project-token"
+    help
+        Create a project at https://simpleota.com, then copy a project API
+        token with the device scope (Project -> API tokens).
+
+endmenu

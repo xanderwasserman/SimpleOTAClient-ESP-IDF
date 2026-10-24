@@ -1,0 +1,12 @@
+# Two OTA app slots of 1700K and no factory partition. A serial flash boots
+# ota_0, and updates alternate between ota_0 and ota_1. This is the table that
+# CONFIG_PARTITION_TABLE_TWO_OTA_LARGE selects on ESP-IDF 5.4 and later,
+# written out so the examples build on every supported ESP-IDF version.
+# Needs 4MB of flash; 540K is free after ota_1.
+#
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     ,        0x6000,
+otadata,  data, ota,     ,        0x2000,
+phy_init, data, phy,     ,        0x1000,
+ota_0,    app,  ota_0,   ,        1700K,
+ota_1,    app,  ota_1,   ,        1700K,

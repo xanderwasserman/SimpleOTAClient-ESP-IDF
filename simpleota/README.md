@@ -6,9 +6,9 @@ firmware with on-the-fly SHA-256 and Ed25519 signature verification, reports
 the full update lifecycle to the dashboard, and integrates with the ESP-IDF
 bootloader's app-rollback support so a bad build backs itself out.
 
-The sibling of [SimpleOTAClient-Arduino](https://github.com/xanderwasserman/SimpleOTAClient-Arduino):
-both clients implement the same device API contract and the same signed
-firmware semantics, so mixed fleets behave identically. A device keeps its
+The sibling of [SimpleOTAClient-Arduino](https://github.com/wassie-dev/simpleOTAClient-Arduino),
+which is the same client with the same `simpleota.h` API, so mixed fleets
+behave identically. A device keeps its
 identity (Wi-Fi MAC device id) across a migration between the two.
 
 Local OTA (ArduinoOTA, espota, ElegantOTA) is for a board on your desk. SimpleOTA is managed fleet OTA for ESP32 when those devices are in the field, without pulling you into a full IoT platform.
@@ -25,7 +25,7 @@ Signing here protects the delivery path. It is not Secure Boot. They stack if yo
 Starting a new project? [simpleOTA-starter-esp-idf](https://github.com/wassie-dev/simpleOTA-starter-esp-idf) is a template repo with a working ESP-IDF app and a GitHub Actions release workflow already set up.
 
 ```sh
-idf.py add-dependency "xanderwasserman/simpleota"
+idf.py add-dependency "wassie-dev/simpleota"
 ```
 
 ## Requirements
@@ -50,9 +50,8 @@ idf.py add-dependency "xanderwasserman/simpleota"
 
   The partition table and the bootloader settings ship with the **first
   serial flash**; they cannot be changed later over OTA. Without
-  `BOOTLOADER_APP_ROLLBACK_ENABLE` the component still updates firmware, but
-  without automatic rollback: a new image is accepted on its first boot and
-  reported `confirmed`.
+  `BOOTLOADER_APP_ROLLBACK_ENABLE` the component rolls back on its own
+  (see [Rollback](#rollback)), which catches less.
 
 ## Quick start
 
@@ -80,38 +79,66 @@ not wait for one, set the optional `.is_connected` callback to return false
 until it does: each check then waits for the link, as
 [examples/basic](../examples/basic/main/main.c) does.
 See [examples/basic](../examples/basic) for a full project including Wi-Fi
-bring-up, and [examples/signed](../examples/signed) for signed firmware.
+bring-up, [examples/polling](../examples/polling) for polling mode, and
+[examples/signed](../examples/signed) for signed firmware.
 
-## Configuration
+### Polling mode
 
-All fields of `simpleota_config_t` (strings are copied at init):
+To run the checks from your own task instead, skip `simpleota_start()`:
 
-| Field | Default | Purpose |
-|---|---|---|
-| `token` | required | Project API token (device scope) or per-device token |
-| `base_url` | `https://simpleota.com` | Platform base URL |
-| `device_id` | Wi-Fi STA MAC (`aa:bb:cc:dd:ee:ff`) | Stable per-unit identifier |
-| `chip_family` | `CONFIG_IDF_TARGET` | e.g. `esp32`, `esp32s3`, `esp32c3` |
-| `board_id`, `hardware_revision`, `partition_profile`, `channel` | omitted | Compatibility metadata; report what your artifacts constrain |
-| `labels_json` | omitted | Reserved: sent verbatim on check-ins, not yet consumed by the platform |
-| `security_mode` | omitted | `SIMPLEOTA_SECURITY_SIGNED` to enforce signed firmware |
-| `version_label` | last persisted | Display-only version string |
-| `nvs_schema_version` | 1 | On-device data schema the firmware expects |
-| `check_interval_s` | 3600 | Steady-state poll interval |
-| `initial_delay_ms` | 0 | Delay before the first check after `simpleota_start()` |
-| `confirm_timeout_s` | 300 | Trial window before automatic rollback |
-| `manual_confirm` | false | true: you call `simpleota_confirm()` after health checks |
-| `disable_auto_reboot` | false | true: you call `simpleota_reboot_for_update()`. No further update is downloaded until then. |
-| `signing_keys`, `num_signing_keys` | none | Up to 2 pinned Ed25519 public keys (PEM) |
-| `is_connected` | always try | Return false while the link is down. It is polled every second, and the check runs as soon as it returns true |
-| `event_cb`, `user_ctx` | none | Lifecycle events (see `simpleota_event_id_t`) |
-| `cert_pem` | none | Pin a specific CA instead of the certificate bundle |
-| `crt_bundle_attach` | `esp_crt_bundle_attach` | Override the bundle function |
+```c
+bool update = false;
+if (simpleota_check(&update) == ESP_OK && update) {
+    simpleota_result_t r = simpleota_apply();   // reboots on success
+    if (r != SIMPLEOTA_OK) ESP_LOGW("app", "update failed: %d", r);
+}
+```
+
+Each call runs on a short-lived task with `CONFIG_SIMPLEOTA_TASK_STACK_SIZE`
+while your task waits, so calling from `app_main()` with its default stack
+is fine.
+
+In polling mode you confirm a trial yourself with `simpleota_confirm()` once
+the new image is healthy, whatever `manual_confirm` says. The modes don't mix:
+while the managed task runs, `simpleota_check()` returns
+`ESP_ERR_INVALID_STATE` and `simpleota_apply()` returns `SIMPLEOTA_NO_OFFER`, with a warning.
+[examples/polling](../examples/polling) is a complete project.
+
+`simpleota_set_server_url()` moves check-ins to another `https://` server
+while the managed task is stopped, and `simpleota_last_offered_version()`
+returns the last offer's version label.
+
+## API reference
+
+The **[API reference](https://wassie-dev.github.io/simpleOTAClient-core/latest/)** documents every
+function, result, event and configuration field. It is generated from
+[`include/simpleota.h`](include/simpleota.h), which has the same comments.
+In short:
+
+- Fill a [`simpleota_config_t`](https://wassie-dev.github.io/simpleOTAClient-core/latest/structsimpleota__config__t.html)
+  from all zeros and call `simpleota_init()` early. Strings are copied.
+- Managed mode: `simpleota_start()`, `simpleota_stop()`,
+  `simpleota_check_now()`.
+- Polling mode: `simpleota_check()`, then `simpleota_apply()`, from one
+  task of yours.
+- Trials: `simpleota_confirm()`, `simpleota_is_trial_boot()`.
+- With `disable_auto_reboot`: `simpleota_reboot_for_update()`.
+- Also `simpleota_set_server_url()`, `simpleota_current_build()`,
+  `simpleota_last_offered_version()` and `simpleota_deinit()`.
+
+`event_cb` runs on the task doing the work: keep it short, and call only
+`simpleota_reboot_for_update()` from it. The `reason` tokens that events
+and the dashboard show are listed under [Update lifecycle](#update-lifecycle)
+and [Rollback](#rollback).
+
+## Build options
 
 Build-time knobs (menuconfig, "SimpleOTA"): task stack size (12288),
 priority (5), HTTP timeout (15 s), HTTP TX buffer (2048 -- must fit the long
-pre-signed download URLs), download chunk size (4096), and
-`SIMPLEOTA_DISABLE_TRIAL_WATCHDOG` (off), which leaves the trial watchdog out.
+pre-signed download URLs), download chunk size (4096),
+`SIMPLEOTA_SOFTWARE_ROLLBACK` (on; only without bootloader rollback, see
+[Rollback](#rollback)), and `SIMPLEOTA_DISABLE_TRIAL_WATCHDOG` (off), which
+leaves the trial watchdog out.
 
 ## Update lifecycle
 
@@ -122,15 +149,37 @@ download_started -> downloaded -> flashed -> validated -> reboot
     -> (next successful check-in) confirmed | rolled_back
 ```
 
-Failures report `failed` with a reason token (`checksum_mismatch`,
-`signature_invalid`, `download_stalled`, `update_begin_failed`, ...) that the
-dashboard shows inline on the device row. Once a boot has worked out what
-happened to a trial, its `confirmed` or `rolled_back` report goes to an outbox
-in NVS (two slots, oldest dropped first) and never holds up an update. Reports
-are kept until the server answers, across reboots: any HTTP response counts as
-delivered, and the device does not act on what it says. Without a response the
-report is sent again, first after 10 s (three times), then at the normal check
-interval.
+Failures report `failed` with a reason token that the dashboard shows
+inline on the device row, and that `SIMPLEOTA_EVENT_UPDATE_FAILED` carries:
+
+| Reason | Stage |
+|---|---|
+| `downgrade_refused` | The offered build is not above the running one (reported once per boot) |
+| `insecure_url` | The download URL is not `https://` |
+| `signature_invalid` | A signed offer failed Ed25519 verification, or a required signature is missing |
+| `https_begin_failed` | The download connection could not be opened |
+| `http_status_<N>` | The download returned HTTP N, or a fourth redirect |
+| `redirect_not_https` | A download redirect led to a plain HTTP URL |
+| `redirect_malformed` | A download redirect had no usable `Location` |
+| `update_begin_failed` | The update slot could not be opened: no second OTA slot, or the image is larger than the slot |
+| `update_write_failed` | A flash write failed during the download |
+| `stream_error` | The connection broke during the download |
+| `download_stalled` | No bytes arrived for `CONFIG_SIMPLEOTA_HTTP_TIMEOUT_MS` |
+| `short_read` | The download ended before its size |
+| `checksum_mismatch` | The SHA-256 of the download did not match the offer |
+| `update_end_failed` | The image failed ESP-IDF's image check, or the boot slot could not be switched |
+| `state_save_failed` | The trial record could not be saved to NVS before the slot switch |
+
+Once a boot has worked out what happened to a trial, its `confirmed` or
+`rolled_back` report goes to an outbox in NVS (two slots, oldest dropped
+first) and never holds up an update. Reports are kept until the server
+answers, across reboots: any HTTP response counts as delivered, and the
+device does not act on what it says. Without a response the report is sent
+again, first after 10 s (three times), then at the normal check interval.
+
+Check-ins and status posts retry once after 2 s when no response arrives
+(not during a trial), and never retry a response that arrived. The download
+does not retry; the next check can try again.
 
 ## Rollback
 
@@ -174,14 +223,59 @@ without `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, a corrupt image can be refused
 by the bootloader's basic image verification and then surfaces as
 `rolled_back`.
 
+Without `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, a new image still runs as a
+trial (`CONFIG_SIMPLEOTA_SOFTWARE_ROLLBACK`, on by default). The component
+switches the boot slot back itself when the confirm timeout runs out, when the
+trial boots after a panic or watchdog reset, or when the device wakes from
+deep sleep before confirming. It cannot catch a crash that comes before
+`simpleota_init()` runs, so bootloader rollback is still recommended for new
+devices. Turn the option off to accept a new image on its first boot.
+
 `simpleota_confirm()` marks the image valid in the bootloader first. If that
-fails, it returns the error and the trial keeps running, so call it again.
+fails, it returns `ESP_FAIL` and the trial keeps running, so call it again.
 While a trial is running, no further update is downloaded: the other slot holds
 the previous image the trial may still return to.
 
 Confirmation is automatic on the first successful check-in. If your
 application has its own health checks, set `.manual_confirm = true` and call
 `simpleota_confirm()` once they pass.
+
+## Anti-rollback
+
+An offer whose build number is not above the running build is refused
+(`downgrade_refused`, `SIMPLEOTA_DOWNGRADE`), because an old image's
+signature still verifies and old builds can carry fixed bugs. To go back,
+release the old code under a new, higher build number.
+
+The running build is the one stored with the image SimpleOTA installed. An
+image flashed some other way, such as over serial, reports build 0, so the
+server offers it the current release and a device reused for another
+project takes that project's builds.
+
+### When to set `image_build`
+
+Most projects never need it. Leave it at 0 while you develop and test, and
+whenever devices only get firmware from SimpleOTA.
+
+It is for one situation: you flash a **release** image over USB, such as at
+the factory or when re-flashing a unit in the field, and the same file is
+also a SimpleOTA upload. Without it the device reports build 0, so on its
+first check-in the server sends it the current release again, or an older
+one if that is what its deployment targets. With it, the device reports the
+build it actually runs and is left alone.
+
+To use it:
+
+1. Look up the project's last build number on the dashboard, say 41.
+   SimpleOTA numbers each upload one above the last, so the next upload
+   will be 42.
+2. Set `.image_build = 42` and build.
+3. Upload that exact `.bin` to SimpleOTA, and check that it got build 42.
+4. Flash the same `.bin` over USB.
+
+If the number is wrong, the device reports a build it does not run. Set too
+high, it is not offered any build up to that number, so set it back to 0 in
+the next upload whenever you are not sure.
 
 ## Partition table
 
@@ -234,22 +328,22 @@ change over OTA. A new layout reaches a device only through a serial flash.
 
 ## Footprint
 
-Measured with ESP-IDF 5.3 and size optimization
+Measured with ESP-IDF 5.1.4 and size optimization
 (`CONFIG_COMPILER_OPTIMIZATION_SIZE=y`), building the `basic` example against
 the same project without SimpleOTA:
 
 | Target | Added to an app that already uses HTTPS, NVS and OTA | Added to a Wi-Fi-only app | `basic` example: free in a 1700 KB slot | `basic` example: free in a 1 MB slot |
 |---|---|---|---|---|
-| ESP32 | 31 KB flash, 1.5 KB RAM | 206 KB flash, 3.0 KB RAM | 48% | 14% |
-| ESP32-S3 | 31 KB flash, 1.5 KB RAM | 211 KB flash, 3.0 KB RAM | 48% | 14% |
-| ESP32-C6 | 34 KB flash, 1.5 KB RAM | 251 KB flash, 3.0 KB RAM | 42% | 4% |
+| ESP32 | 32 KB flash, 1.6 KB RAM | 204 KB flash, 3.5 KB RAM | 47% | 12% |
+| ESP32-S3 | 33 KB flash, 1.5 KB RAM | 208 KB flash, 3.8 KB RAM | 48% | 14% |
+| ESP32-C6 | 34 KB flash, 1.9 KB RAM | 245 KB flash, 4.1 KB RAM | 43% | 6% |
 
-RAM is static RAM (`.data` and `.bss`).
+RAM is static RAM (`.data`, `.bss` and IRAM code).
 
-The component itself (`libsimpleota.a`, including the vendored Ed25519 and
-SHA-256 code) is about 26 KB of flash. Most of the flash added to a Wi-Fi-only
-app is the HTTPS stack (mbedTLS, `esp_http_client` and the certificate
-bundle), which an app that already makes HTTPS requests has anyway.
+Most of the flash added to a Wi-Fi-only app is the HTTPS stack (mbedTLS,
+`esp_http_client` and the certificate bundle), which an app that already
+makes HTTPS requests has anyway; the rest is the component itself, including
+its Ed25519 and SHA-256 code.
 
 At run time the component's task uses a stack of
 `CONFIG_SIMPLEOTA_TASK_STACK_SIZE` bytes (12288 by default). A check
@@ -278,7 +372,7 @@ simpleota_config_t cfg = {
 };
 ```
 
-Behavior matrix (identical to the Arduino client):
+Behavior matrix (the same in the Arduino library):
 
 | Device state | Offer | Result |
 |---|---|---|
@@ -313,7 +407,10 @@ from `signature_invalid`.
 Server and download connections use the ESP-IDF certificate bundle by
 default (`CONFIG_MBEDTLS_CERTIFICATE_BUNDLE`, enabled by default), so there
 is no CA to paste or rotate. Pin a specific CA with `.cert_pem` if you
-prefer. Plain HTTP download URLs are refused (`insecure_url`).
+prefer. Everything is HTTPS: a `base_url` that is not `https://` fails
+`simpleota_init()`, a plain HTTP download URL is refused (`insecure_url`),
+and a download follows up to three redirects, each only to another
+`https://` URL (`redirect_not_https` otherwise).
 
 ### Task watchdog warnings during the handshake
 
@@ -342,9 +439,11 @@ mbedTLS call. Pick whichever fix suits your project:
 ## Examples
 
 - [examples/basic](../examples/basic): managed updates with rollback.
+- [examples/polling](../examples/polling): the app runs the checks and
+  confirms trials itself, and handles each `simpleota_result_t`.
 - [examples/signed](../examples/signed): on-device Ed25519 verification.
 
-Both are complete projects (`idf.py menuconfig` for Wi-Fi + token, then
+All are complete projects (`idf.py menuconfig` for Wi-Fi + token, then
 `idf.py flash monitor`). They build against the in-repo component through a
 local override that works from any clone directory name (the component lives
 in the `simpleota/` subdirectory precisely so the override resolves).
@@ -356,17 +455,78 @@ rollback.
 
 ## Testing
 
-`make -C test/host test` runs the security-critical modules (Ed25519
-verification, SHA-256, the signed-firmware gate, response parsing) on the
-host with plain cc: RFC 8032 vectors, NIST SHA-256 vectors, a vector
-generated by the actual SimpleOTA server stack, tamper/wrong-key/truncation
-negatives, key rotation, and the full gate truth table. It also runs the
-trial decisions: how each boot reads the trial record, the report outbox and
-retry timing, rollback reasons, and the watchdog's timing. CI builds both
-examples across IDF v5.1 through latest on Xtensa and RISC-V targets.
+The update logic is the shared core in `src/core`, copied from
+[SimpleOTAClient-core](https://github.com/wassie-dev/simpleOTAClient-core) at
+the commit in `src/core/CORE_VERSION`. Its host tests cover signing, SHA-256,
+response parsing, the trial record, rollback, and a power cut at every storage
+write. CI checks that `src/core` matches that commit, and builds the examples
+across IDF v5.1 through latest on Xtensa and RISC-V targets.
+
+## Arduino and ESP-IDF
+
+The [Arduino library](https://github.com/wassie-dev/simpleOTAClient-Arduino)
+is this same client: the same `simpleota.h`, built from the same sources, so
+code that uses SimpleOTA works unchanged in a sketch. Two things differ,
+because Arduino-ESP32 has no Kconfig and no certificate bundle:
+
+- The build-time knobs above are `-D` flags there (`CONFIG_SIMPLEOTA_HTTP_TIMEOUT_MS`
+  and so on, with the same defaults), set in PlatformIO's `build_flags`.
+- Without `cert_pem`, TLS is verified against the ISRG Root X1 and X2
+  certificates that SimpleOTA's hosts chain to, instead of the bundle.
+
+## Upgrading from 0.2
+
+The component's registry name changes to `wassie-dev/simpleota`: replace
+`xanderwasserman/simpleota` in your `idf_component.yml`. The old name keeps
+its 0.2.x releases and gets no new ones.
+
+Devices update from 0.2.x over the air, also in the middle of a trial: the
+NVS layout is unchanged, and a trial that fails returns to the old release,
+which reads the rollback as it always has. 1.0.0 adds one NVS key,
+`sota_image`, which older releases ignore. Existing code compiles unchanged,
+unless it uses `SIMPLEOTA_SECURITY_TOKEN` or sets `security_mode` to a
+string; what behaves differently:
+
+- `security_mode` is now an enum, `simpleota_security_t`. The
+  `SIMPLEOTA_SECURITY_BASIC` and `SIMPLEOTA_SECURITY_SIGNED` names still
+  work. `SIMPLEOTA_SECURITY_TOKEN` is gone: the platform never used a
+  reported "token", and a device reporting it was offered neither basic nor
+  signed builds.
+- `SIMPLEOTA_SECURITY_SIGNED` without a signing key fails
+  `simpleota_init()` with `ESP_ERR_INVALID_ARG`: such a device would be
+  offered signed builds it cannot verify.
+- A `base_url` that is not `https://` fails `simpleota_init()` with
+  `ESP_ERR_INVALID_ARG`, and download redirects are followed only to
+  `https://` URLs.
+- An offer whose build is not above the running one is refused
+  (`downgrade_refused`). See [Anti-rollback](#anti-rollback).
+- An image flashed over USB reports build 0, so the server offers it its
+  current release (see [When to set `image_build`](#when-to-set-image_build)
+  if you flash release images over USB). Before, it kept reporting
+  the build SimpleOTA last installed.
+- `manual_confirm` applies to managed mode only. Without
+  `simpleota_start()`, call `simpleota_confirm()` yourself.
+- Without `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, new images now run as
+  trials and roll back on any reset before they are confirmed. Confirm
+  before restarting on purpose, or turn `CONFIG_SIMPLEOTA_SOFTWARE_ROLLBACK`
+  off to keep the old behaviour.
+- `simpleota_confirm()` returns `ESP_FAIL` when the bootloader cannot record
+  the image as good, and `simpleota_deinit()` returns
+  `ESP_ERR_INVALID_STATE` from `event_cb`.
+- Every check logs its result at info level (`check: no update (up_to_date)`,
+  `check: offer build=N`, `check: failed (HTTP N)`).
+
+Going back to 0.2.x over USB works, but 0.2.x does not know the `sota_image`
+key, so it keeps reporting the build 1.0.0 stored (the last one SimpleOTA
+installed) instead of build 0. The server then offers it nothing until a
+higher build ships. Erase NVS when you flash it, or release the build you
+want as a new, higher one.
+
+The [CHANGELOG](https://github.com/wassie-dev/simpleOTAClient-ESP-IDF/blob/main/CHANGELOG.md)
+lists every change.
 
 ## License
 
 MIT (see [LICENSE](LICENSE)). Ed25519 verification uses a vendored,
 unmodified copy of [Monocypher](https://monocypher.org/) 3.1.3, dual-licensed
-CC0-1.0 / BSD-2-Clause (see [src/vendor/LICENSE.md](src/vendor/LICENSE.md)).
+CC0-1.0 / BSD-2-Clause (see [src/core/LICENSE-vendor.md](src/core/LICENSE-vendor.md)).

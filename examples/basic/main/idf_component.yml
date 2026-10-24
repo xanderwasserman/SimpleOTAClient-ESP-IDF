@@ -1,5 +1,5 @@
 dependencies:
-  xanderwasserman/simpleota:
+  wassie-dev/simpleota:
     version: "*"
     # Local and CI builds resolve the component from this repo checkout. The
     # component manager matches a local dependency by the basename of this

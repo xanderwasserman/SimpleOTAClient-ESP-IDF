@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.0.0
+
+The client is now [SimpleOTAClient-core](https://github.com/wassie-dev/simpleOTAClient-core), copied into `simpleota/src/core` and `simpleota/include`. The Arduino library 1.0.0 ships the same code with this same `simpleota.h` API, so both have the same features, defaults and behaviour, and code that uses SimpleOTA moves between them unchanged.
+
+### Upgrading
+
+- **The repository moved to [wassie-dev/simpleOTAClient-ESP-IDF](https://github.com/wassie-dev/simpleOTAClient-ESP-IDF).** GitHub redirects the old URL.
+- **The registry component is now `wassie-dev/simpleota`.** Change the dependency in your `idf_component.yml` (or run `idf.py add-dependency "wassie-dev/simpleota"`). `xanderwasserman/simpleota` keeps its 0.x releases and gets no further ones.
+- **Devices update from 0.2.x over the air**, mid-trial too. The NVS keys and their meanings are unchanged, and a trial that fails returns to the old release, which reads the rollback as it always has. 1.0.0 adds one key, `sota_image`, which older releases ignore.
+- **Existing code compiles unchanged**, unless it uses `SIMPLEOTA_SECURITY_TOKEN` or sets `security_mode` to a string. Every 0.2.x function and config field is still there.
+- **`security_mode` is an enum**, `simpleota_security_t`; `SIMPLEOTA_SECURITY_BASIC` and `SIMPLEOTA_SECURITY_SIGNED` keep their names. **`SIMPLEOTA_SECURITY_TOKEN` is gone**. The platform never used a reported "token", and it kept such a device from matching basic and signed builds. The platform no longer stores a reported "token" and has cleared the values it kept, so devices that reported it match basic builds again.
+- **`SIMPLEOTA_SECURITY_SIGNED` needs a signing key.** Without one `simpleota_init()` returns `ESP_ERR_INVALID_ARG`: 0.2.x applied the signed builds such a device was offered with only a checksum check.
+- **Older builds are refused**: an offer whose build is not above the running one fails with `downgrade_refused`. To go back, release the old code under a new, higher build number.
+- **An image flashed over USB reports build 0**, so the server offers it its current release. Firmware that is flashed over USB as a release can declare its build in `image_build`; see the README for when to. Before, it kept reporting the build SimpleOTA last installed.
+- **Without `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, new images run as trials** and roll back on any reset before they are confirmed. Confirm before restarting on purpose, or turn `CONFIG_SIMPLEOTA_SOFTWARE_ROLLBACK` off to accept a new image on its first boot, as 0.2.x did.
+- A `base_url` that is not `https://` fails `simpleota_init()` with `ESP_ERR_INVALID_ARG`.
+- `manual_confirm` applies to managed mode only. Without `simpleota_start()`, call `simpleota_confirm()` yourself.
+- `simpleota_confirm()` returns `ESP_FAIL`, not the bootloader's error code, when the image cannot be recorded as good.
+- **Going back to 0.2.x over USB:** 0.2.x does not know `sota_image`, so it keeps reporting the build 1.0.0 stored, the last one SimpleOTA installed, and is offered nothing until a higher build ships. Erase NVS when you flash it, or release the build you want as a new, higher one.
+
+### Added
+
+- Polling mode: `simpleota_check(&update)` and `simpleota_apply()`, for apps that run the checks from their own task. `simpleota_check()` returns `ESP_FAIL` when the server did not answer, so a failed check is not mistaken for no update. [examples/polling](examples/polling) shows it.
+- `SIMPLEOTA_API_VERSION`, to test at compile time for something added in a later 1.x release. `simpleota.h` states what every 1.x release keeps: a config field left at zero gets its default, nothing is changed or removed, and the `reason` tokens it lists stay.
+- `simpleota_set_server_url()` and `simpleota_last_offered_version()`, as on Arduino.
+- Anti-rollback: an offer whose build number is not above the running build is refused (`downgrade_refused`; `SIMPLEOTA_DOWNGRADE` in polling mode). An old image's signature still verifies, so this stops an old, vulnerable build being pushed.
+- `image_build`: the build an image reports when it was flashed some other way than SimpleOTA, such as over USB. The running image's ELF SHA-256 is stored as `sota_image` to tell those images apart, so a device reused for another project no longer reports, and refuses offers below, the old project's build.
+- `CONFIG_SIMPLEOTA_SOFTWARE_ROLLBACK` (on by default): without `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, the component rolls a trial back itself, as the bootloader would: on a confirm timeout, or on any reset before confirming (a crash, a watchdog, a brownout, a power loss, `esp_restart()` or deep sleep). Bootloader rollback is still recommended: it also catches an image that crashes before `simpleota_init()` on every boot. Configuring such a project prints a CMake warning, and a software-supervised trial logs one warning when it starts.
+
+### Changed
+
+- `simpleota_check()` and `simpleota_apply()` run on a short-lived task with `CONFIG_SIMPLEOTA_TASK_STACK_SIZE` while the caller waits, so they work from `app_main()` and its default 3584-byte stack.
+- A rollback cut short by a power loss is finished on the next boot, instead of leaving the failed image running.
+- The trial watchdog runs without bootloader rollback too.
+- A trial that boots after a panic or watchdog reset is rolled back.
+- A download redirect is followed only to another `https://` URL (`redirect_not_https` otherwise).
+- Without `simpleota_start()`, the confirm timeout rolls back from a short-lived task. Before, nothing acted on it until the next reset.
+- `simpleota_deinit()` from `event_cb` returns `ESP_ERR_INVALID_STATE`, and `simpleota_deinit()` returns `ESP_ERR_TIMEOUT` and releases nothing when the task does not stop, instead of freeing what a running download uses.
+- Tokens of any length work; one over about 180 characters used to fail every request.
+- The update slot is erased as the download is written, not all at once before it, and an image larger than the slot is refused before the download.
+- Server responses are read from their top-level fields only, and numbers too large for 32 bits are refused.
+- Labels that are not one JSON object are left out of the check-in with a warning, instead of making every check-in invalid.
+- Every check logs its result at info level, also during a trial: `check: no update (<status>)`, `check: offer build=N` or `check: failed (HTTP N)`.
+- A refused downgrade is reported to the server once per boot, not on every check.
+- About 1 KB less flash and 100 bytes less static RAM on the ESP32.
+
 ## 0.2.1
 
 The component's code is unchanged; this release updates the examples, the

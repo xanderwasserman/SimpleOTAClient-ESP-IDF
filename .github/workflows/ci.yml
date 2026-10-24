@@ -6,13 +6,21 @@ on:
   pull_request:
 
 jobs:
-  host-tests:
-    name: Host tests (signing, sha256, json, reports)
+  core-sync:
+    name: Vendored core matches its commit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build and run
-        run: make -C test/host test
+      - name: Read the core commit
+        id: core
+        run: echo "sha=$(cat simpleota/src/core/CORE_VERSION)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: wassie-dev/simpleOTAClient-core
+          ref: ${{ steps.core.outputs.sha }}
+          path: core
+      - name: Compare
+        run: core/scripts/sync-core.sh --check simpleota/src/core simpleota/include
 
   build-examples:
     name: "${{ matrix.example }} (IDF ${{ matrix.idf }}, ${{ matrix.target }}, ${{ matrix.wdt }})"
@@ -28,6 +36,7 @@ jobs:
           - { idf: "v5.1.4", target: esp32, example: basic, wdt: require }
           - { idf: "v5.1.4", target: esp32, example: basic, wdt: absent }
           - { idf: "v5.1.4", target: esp32, example: signed, wdt: require }
+          - { idf: "v5.1.4", target: esp32, example: polling, wdt: require }
           - { idf: "v5.1.4", target: esp32c3, example: basic, wdt: require }
           - { idf: "v5.2.8", target: esp32s2, example: basic, wdt: require }
           - { idf: "v5.3.2", target: esp32, example: basic, wdt: require }
@@ -38,6 +47,7 @@ jobs:
           - { idf: "latest", target: esp32s3, example: basic, wdt: require }
           - { idf: "latest", target: esp32c3, example: basic, wdt: require }
           - { idf: "latest", target: esp32c3, example: signed, wdt: require }
+          - { idf: "latest", target: esp32c3, example: polling, wdt: require }
     steps:
       # The examples resolve the in-repo component via override_path pointing
       # at the simpleota/ subdirectory, whose name matches the component name

@@ -6,8 +6,10 @@ config SIMPLEOTA_TASK_STACK_SIZE
     help
         The managed task performs TLS handshakes (esp_http_client with the
         certificate bundle) and response parsing on its own stack. The
-        short-lived task that posts the status for
-        simpleota_reboot_for_update() uses the same size. 8192 usually
+        short-lived tasks that run simpleota_check() and simpleota_apply()
+        in polling mode, roll back a trial without the managed task, and
+        post the status for simpleota_reboot_for_update() use the same
+        size, so the caller's own stack does not matter. 8192 usually
         works; the 12288 default leaves headroom on all targets.
 
 config SIMPLEOTA_TASK_PRIORITY
@@ -38,20 +40,36 @@ config SIMPLEOTA_HTTP_TX_BUFFER
 
 config SIMPLEOTA_DOWNLOAD_CHUNK
     int "Download/flash chunk size (bytes)"
+    range 512 16384
     default 4096
     help
         Heap-allocated buffer used to stream the firmware image from the
         HTTP client into the OTA partition while hashing and verifying.
 
+config SIMPLEOTA_SOFTWARE_ROLLBACK
+    bool "Roll back failed updates without bootloader rollback"
+    default y
+    depends on !BOOTLOADER_APP_ROLLBACK_ENABLE
+    help
+        Without CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE, a new image still
+        runs as a trial: if it is not confirmed within the confirm timeout,
+        or resets for any reason before then (a crash, a watchdog, a
+        brownout, a power loss, esp_restart() or deep sleep), the component
+        switches back to the previous image itself, as the bootloader would.
+        Confirm before restarting on purpose. An image that crashes before
+        simpleota_init() on every boot is not caught, which bootloader
+        rollback does catch, so enable that on new devices. Disable this to
+        accept a new image on its first boot, as releases before 1.0.0 did.
+
 config SIMPLEOTA_DISABLE_TRIAL_WATCHDOG
     bool "Leave the chip watchdog alone during a trial"
     default n
-    depends on BOOTLOADER_APP_ROLLBACK_ENABLE
+    depends on BOOTLOADER_APP_ROLLBACK_ENABLE || SIMPLEOTA_SOFTWARE_ROLLBACK
     help
         On a trial boot the component starts the chip's RTC or LP watchdog
         for the confirm timeout plus a margin, so a hang that stops the
-        confirm timer still resets the chip and the bootloader switches
+        confirm timer still resets the chip and the previous image comes
         back. Enable this to leave the watchdog out. The confirm timer still
-        runs, and a crash still switches back through the bootloader.
+        runs, and a crash still rolls back.
 
 endmenu

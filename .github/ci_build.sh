@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build the example in the working directory, check that the image leaves
 # headroom in its app slot, then optionally require or reject a wdt_hal_init
-# reference in sota_wdt.c's object file.
+# reference in the trial watchdog's object file.
 set -euo pipefail
 mode="${1:-build}"
 
@@ -48,7 +48,7 @@ if [ "$mode" = "build" ]; then
   exit 0
 fi
 
-obj=$(find build -type f \( -name 'sota_wdt.c.obj' -o -name 'sota_wdt.c.o' \) -print -quit)
+obj=$(find build -type f \( -name 'sota_wdt_esp32.c.obj' -o -name 'sota_wdt_esp32.c.o' \) -print -quit)
 if [ -z "$obj" ]; then
   echo "sota_wdt object not found" >&2
   find build -name 'sota_wdt*' >&2 || true

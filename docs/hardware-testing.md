@@ -192,8 +192,10 @@ Use `examples/signed` instead of `examples/basic`, with the same steps as above
 
 ## 10. Test rollback (optional)
 
-Rollback needs `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, which the examples
-set. Deploy a known-good build first, then deploy each of these test builds
+The examples set `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`. Run the table once
+with it, and once with it removed from `sdkconfig.defaults` (after
+`idf.py fullclean` and a serial flash of the new bootloader), where the
+component rolls back in software and every row must end the same way. Deploy a known-good build first, then deploy each of these test builds
 from it and watch the log and the dashboard. Adding
 `.confirm_timeout_s = 60` to the config in `main.c` keeps the waits short.
 
@@ -208,11 +210,29 @@ from it and watch the log and the dashboard. Adding
 
 Unplugging during the download leaves the known-good build running, and it
 downloads the update again on a later check. Run the table once on a board
-that still has 0.1.0, so the first update into this release is covered too.
+that still has 0.2.1, so the first update into this release is covered too.
 If your devices deep-sleep, also put a test build to sleep before it
 confirms: it should wake on the known-good build with `rolled_back` /
 `deep_sleep`. See the main
 [README](../simpleota/README.md#rollback) for what each rollback reason means.
+
+## 11. Test polling mode (optional)
+
+`examples/polling` runs the checks from the app's own loop instead of the
+component's task. Build and flash it as in steps 3 to 6, then test an update
+as in step 8 (upload `build/simpleota_polling.bin`). It checks once at boot
+and then hourly, so reset the board to check sooner. After the update it
+confirms the trial itself once Wi-Fi is up; the log shows `running build N
+(on trial)` and then the `confirmed` report.
+
+## 12. Test anti-rollback and USB flashing (optional)
+
+| Test | Expected result |
+|---|---|
+| Deploy a build that is older than, or the same as, the one the board runs | Nothing is downloaded; `failed` / `downgrade_refused` (`SIMPLEOTA_DOWNGRADE` in `examples/polling`) |
+| Serial-flash a different build over one SimpleOTA installed, with `image_build` left at 0 | The log warns `running an image SimpleOTA did not install; reporting build 0`, and the server offers the board its current release |
+| The same, with `.image_build` in `main.c` set to the build number SimpleOTA gave that exact `.bin` | The board reports that build and is not offered it again |
+| Serial-flash the same `.bin` that SimpleOTA installed | No warning; the board keeps its build |
 
 ## Getting back to Arduino
 

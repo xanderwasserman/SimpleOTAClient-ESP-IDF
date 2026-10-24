@@ -4,9 +4,9 @@
  * Flow: bring up Wi-Fi, initialize SimpleOTA with a project token, start the
  * managed task. The component checks for updates on an interval, downloads
  * and flashes offered firmware (SHA-256 verified), reboots into it as a
- * bootloader-supervised trial, and confirms it on the first successful
- * check-in after boot. If the new image crashes or never confirms, the
- * bootloader rolls back to this image.
+ * trial, and confirms it on the first successful check-in after boot. If
+ * the new image crashes, hangs or never confirms, the device rolls back to
+ * this image.
  *
  * Configure Wi-Fi credentials and the token via `idf.py menuconfig`
  * (Example Configuration).

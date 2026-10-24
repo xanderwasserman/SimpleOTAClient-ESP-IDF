@@ -1,6 +1,7 @@
-/* NOTE: duplicated between examples/basic and examples/signed on purpose:
- * registry-installed examples must be self-contained (create-project-from-
- * example copies one example directory only). Keep both copies in sync. */
+/* NOTE: duplicated between examples/basic, examples/polling and
+ * examples/signed on purpose: registry-installed examples must be
+ * self-contained (create-project-from-example copies one example directory
+ * only). Keep all copies in sync. */
 /* Minimal self-contained Wi-Fi station bring-up for the SimpleOTA examples.
  * (Deliberately not IDF's protocol_examples_common, which is unavailable to
  * out-of-tree projects.) */
